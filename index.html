@@ -88,7 +88,7 @@
       <li><strong>Pick Up / Drop Object:</strong> <code>Spacebar</code> or call <code>pick()</code> / <code>drop()</code></li>
       <li><strong>Move Object To Coordinates:</strong> <code>Enter</code> key and input coordinates, or call <code>moveObjectTo(x, y)</code></li>
     </ul>
-    <p>Your goal is to extinguish all three fires by dropping the object on them.</p>
+    <p>Your goal is to extinguish all three fires by dropping the object on them. After extinguishing a fire, you must pick up the object again to extinguish the next fire.</p>
   </div>
   <div id="message"></div>
   <div id="grid-container"></div>
@@ -101,7 +101,7 @@ now add an object to the grid at a random location, represented by a solid circl
 
 change the player's representation to show that they are carrying an object. surround the grid with numbers showing the coordinates of the cells. expose a function moveObjectTo(x, y). this function should efficiently move the player to the current location of the object, pick up the object, and drop it at x,y. also allow this functionality to be performed with the enter key, where the user is prompted for the x,y coordinates to move the object to.
 
-please fix the moveObjectTo function. it does not pick up the object. keep in mind that the player needs to be facing the object to pick it up. It cannot pick up the object of it is on top of it.
+please fix the moveObjectTo function. it does not pick up the object. keep in mind that the player needs to be facing the object to pick it up. It cannot pick up the object if it is on top of it.
 
 add some text to describe the keys and commands
 
@@ -112,6 +112,8 @@ make it so that the prompt text at the bottom is wrapped, instead of a horizonta
 finally, let's make this into an actual simple game. the grid should also contain three randomly positioned "fires". the fire is represented by a red cell. the player can put the fires out by dropping the object on the cell that contains the fire. the player wins after putting out all three fires. the game restarts three seconds later.
 
 the object should not be consumed by the fire
+
+the player must pick the object up again, after dropping it on a fire
     </pre>
   </div>
   <script>
@@ -323,6 +325,11 @@ the object should not be consumed by the fire
           fires[fireIndex].exists = false;
           firesRemaining--;
           console.log('Extinguished a fire!');
+          // Drop the object on the fire cell
+          object.x = frontCell.x;
+          object.y = frontCell.y;
+          object.exists = true;
+          player.carrying = false;
           if (firesRemaining === 0) {
             console.log('You have extinguished all fires!');
             messageDiv.textContent = 'You have extinguished all fires! Game restarting...';
