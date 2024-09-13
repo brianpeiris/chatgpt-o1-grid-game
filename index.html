@@ -1,0 +1,578 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Grid Game</title>
+  <style>
+    #grid-container {
+      display: grid;
+      grid-template-columns: repeat(11, 40px);
+      grid-template-rows: repeat(11, 40px);
+      width: 440px;
+      height: 440px;
+      border: 1px solid black;
+      margin-bottom: 20px;
+    }
+    .cell, .coord-cell {
+      border: 1px solid gray;
+      box-sizing: border-box;
+      text-align: center;
+      line-height: 40px;
+      font-size: 24px;
+      position: relative;
+    }
+    .coord-cell {
+      background-color: #f0f0f0;
+      font-weight: bold;
+    }
+    .object {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      width: 20px;
+      height: 20px;
+      background-color: black;
+      border-radius: 50%;
+    }
+    .fire {
+      background-color: red;
+    }
+    #instructions {
+      font-family: Arial, sans-serif;
+      margin-bottom: 20px;
+    }
+    #instructions h2 {
+      margin-top: 0;
+    }
+    #instructions ul {
+      list-style-type: none;
+      padding-left: 0;
+    }
+    #instructions li {
+      margin-bottom: 5px;
+    }
+    #instructions code {
+      background-color: #f2f2f2;
+      padding: 2px 4px;
+      border-radius: 4px;
+    }
+    #prompts {
+      font-family: Arial, sans-serif;
+      margin-top: 20px;
+    }
+    #prompts h3 {
+      margin-top: 0;
+    }
+    #prompts pre {
+      background-color: #f9f9f9;
+      padding: 10px;
+      border: 1px solid #ccc;
+      white-space: pre-wrap;
+      word-wrap: break-word;
+      overflow: auto;
+    }
+    #message {
+      font-family: Arial, sans-serif;
+      font-size: 20px;
+      color: green;
+      margin-bottom: 20px;
+    }
+  </style>
+</head>
+<body>
+  <div id="instructions">
+    <h2>Grid Game Controls</h2>
+    <ul>
+      <li><strong>Move Forward:</strong> <code>Up Arrow</code> or call <code>moveForward()</code></li>
+      <li><strong>Turn Left:</strong> <code>Left Arrow</code> or call <code>turnLeft()</code></li>
+      <li><strong>Turn Right:</strong> <code>Right Arrow</code> or call <code>turnRight()</code></li>
+      <li><strong>Pick Up / Drop Object:</strong> <code>Spacebar</code> or call <code>pick()</code> / <code>drop()</code></li>
+      <li><strong>Move Object To Coordinates:</strong> <code>Enter</code> key and input coordinates, or call <code>moveObjectTo(x, y)</code></li>
+    </ul>
+    <p>Your goal is to extinguish all three fires by dropping the object on them.</p>
+  </div>
+  <div id="message"></div>
+  <div id="grid-container"></div>
+  <div id="prompts">
+    <h3>Prompts Used to Generate This Application:</h3>
+    <pre>
+write an application with html and javascript in a single index.html file. the application draws an 10x10 grid with a player positioned at 9,9, facing a random cardinal direction. the player should have an arrow centered on it. the player can move forward one cell at a time or turn 90 degrees to the left or right. make it so that I can control the player with my left, right and up arrow keys. the application should also expose functions to the developer console for movement; moveForward(), turnLeft(), and turnRight().
+
+now add an object to the grid at a random location, represented by a solid circle. the player can pick up the object when facing it. use the spacebar for that action. The player can also drop an object they are carrying with the spacebar, which places it in the cell in front of the player. expose these actions with drop() and pick() functions as well.
+
+change the player's representation to show that they are carrying an object. surround the grid with numbers showing the coordinates of the cells. expose a function moveObjectTo(x, y). this function should efficiently move the player to the current location of the object, pick up the object, and drop it at x,y. also allow this functionality to be performed with the enter key, where the user is prompted for the x,y coordinates to move the object to.
+
+please fix the moveObjectTo function. it does not pick up the object. keep in mind that the player needs to be facing the object to pick it up. It cannot pick up the object of it is on top of it.
+
+add some text to describe the keys and commands
+
+Add some text under the grid that shows the prompts I gave you to generate this application. Include this prompt as well.
+
+make it so that the prompt text at the bottom is wrapped, instead of a horizontally scrolling section.
+
+finally, let's make this into an actual simple game. the grid should also contain three randomly positioned "fires". the fire is represented by a red cell. the player can put the fires out by dropping the object on the cell that contains the fire. the player wins after putting out all three fires. the game restarts three seconds later.
+
+the object should not be consumed by the fire
+    </pre>
+  </div>
+  <script>
+    const gridContainer = document.getElementById('grid-container');
+    const messageDiv = document.getElementById('message');
+    const cells = [];
+    const dirMap = ['N', 'E', 'S', 'W'];
+    const arrowSymbols = {
+      'N': '↑',
+      'E': '→',
+      'S': '↓',
+      'W': '←',
+    };
+    const carryingSymbols = {
+      'N': '↑*',
+      'E': '→*',
+      'S': '↓*',
+      'W': '←*',
+    };
+    let player, object, fires, firesRemaining;
+
+    function initGame() {
+      // Initialize player
+      player = {
+        x: 9,
+        y: 9,
+        dirIndex: Math.floor(Math.random() * 4),
+        carrying: false
+      };
+
+      // Initialize object
+      object = {
+        x: Math.floor(Math.random() * 10),
+        y: Math.floor(Math.random() * 10),
+        exists: true
+      };
+
+      // Ensure the object is not at the player's starting position
+      while (object.x === player.x && object.y === player.y) {
+        object.x = Math.floor(Math.random() * 10);
+        object.y = Math.floor(Math.random() * 10);
+      }
+
+      // Initialize fires
+      fires = [];
+      firesRemaining = 3;
+      while (fires.length < 3) {
+        const fireX = Math.floor(Math.random() * 10);
+        const fireY = Math.floor(Math.random() * 10);
+        // Ensure fire doesn't overlap with player, object, or other fires
+        if (
+          (fireX !== player.x || fireY !== player.y) &&
+          (fireX !== object.x || fireY !== object.y) &&
+          !fires.some(fire => fire.x === fireX && fire.y === fireY)
+        ) {
+          fires.push({ x: fireX, y: fireY, exists: true });
+        }
+      }
+
+      messageDiv.textContent = '';
+      renderGrid();
+    }
+
+    // Create grid and cells with coordinate labels
+    for (let y = -1; y < 10; y++) {
+      for (let x = -1; x < 10; x++) {
+        const cell = document.createElement('div');
+        if (x === -1 && y === -1) {
+          cell.classList.add('coord-cell');
+          cell.textContent = '';
+        } else if (y === -1) {
+          cell.classList.add('coord-cell');
+          cell.textContent = x;
+        } else if (x === -1) {
+          cell.classList.add('coord-cell');
+          cell.textContent = y;
+        } else {
+          cell.classList.add('cell');
+          if (!cells[y]) cells[y] = [];
+          cells[y][x] = cell;
+        }
+        gridContainer.appendChild(cell);
+      }
+    }
+
+    function renderGrid() {
+      // Clear all cells
+      for (let y = 0; y < 10; y++) {
+        for (let x = 0; x < 10; x++) {
+          cells[y][x].textContent = '';
+          cells[y][x].innerHTML = '';
+          cells[y][x].classList.remove('fire');
+        }
+      }
+      // Render fires
+      fires.forEach(fire => {
+        if (fire.exists) {
+          cells[fire.y][fire.x].classList.add('fire');
+        }
+      });
+
+      // Render object if it exists and not being carried
+      if (object.exists && (!player.carrying || (object.x !== player.x || object.y !== player.y))) {
+        const objCell = cells[object.y][object.x];
+        const objDiv = document.createElement('div');
+        objDiv.classList.add('object');
+        objCell.appendChild(objDiv);
+      }
+
+      // Set player's cell
+      const cell = cells[player.y][player.x];
+      if (player.carrying) {
+        cell.textContent = carryingSymbols[dirMap[player.dirIndex]];
+      } else {
+        cell.textContent = arrowSymbols[dirMap[player.dirIndex]];
+      }
+    }
+
+    function moveForward() {
+      let newX = player.x;
+      let newY = player.y;
+      switch (dirMap[player.dirIndex]) {
+        case 'N':
+          newY -= 1;
+          break;
+        case 'E':
+          newX += 1;
+          break;
+        case 'S':
+          newY += 1;
+          break;
+        case 'W':
+          newX -= 1;
+          break;
+      }
+
+      // Check bounds
+      if (newX >= 0 && newX < 10 && newY >= 0 && newY < 10) {
+        player.x = newX;
+        player.y = newY;
+        renderGrid();
+      }
+    }
+
+    function turnLeft() {
+      player.dirIndex = (player.dirIndex + 3) % 4;
+      renderGrid();
+    }
+
+    function turnRight() {
+      player.dirIndex = (player.dirIndex + 1) % 4;
+      renderGrid();
+    }
+
+    function getCellInFront() {
+      let newX = player.x;
+      let newY = player.y;
+      switch (dirMap[player.dirIndex]) {
+        case 'N':
+          newY -= 1;
+          break;
+        case 'E':
+          newX += 1;
+          break;
+        case 'S':
+          newY += 1;
+          break;
+        case 'W':
+          newX -= 1;
+          break;
+      }
+
+      // Check bounds
+      if (newX >= 0 && newX < 10 && newY >= 0 && newY < 10) {
+        return { x: newX, y: newY };
+      } else {
+        return null;
+      }
+    }
+
+    function pick() {
+      if (player.carrying) {
+        console.log('Already carrying an object.');
+        return;
+      }
+
+      const frontCell = getCellInFront();
+      if (frontCell && object.exists && object.x === frontCell.x && object.y === frontCell.y) {
+        player.carrying = true;
+        object.exists = false;
+        console.log('Picked up the object.');
+        renderGrid();
+      } else {
+        console.log('No object to pick up.');
+      }
+    }
+
+    function drop() {
+      if (!player.carrying) {
+        console.log('Not carrying any object.');
+        return;
+      }
+
+      const frontCell = getCellInFront();
+      if (frontCell && frontCell.x >= 0 && frontCell.x < 10 && frontCell.y >= 0 && frontCell.y < 10) {
+        const fireIndex = fires.findIndex(fire => fire.x === frontCell.x && fire.y === frontCell.y && fire.exists);
+        if (fireIndex !== -1) {
+          // Extinguish the fire
+          fires[fireIndex].exists = false;
+          firesRemaining--;
+          console.log('Extinguished a fire!');
+          if (firesRemaining === 0) {
+            console.log('You have extinguished all fires!');
+            messageDiv.textContent = 'You have extinguished all fires! Game restarting...';
+            setTimeout(initGame, 3000);
+          }
+          renderGrid();
+          return;
+        } else if (!object.exists) {
+          // Cannot drop the object if it's not in inventory
+          console.log('You have no object to drop.');
+          return;
+        } else if (!object.exists || (object.x !== frontCell.x || object.y !== frontCell.y)) {
+          object.x = frontCell.x;
+          object.y = frontCell.y;
+          object.exists = true;
+          player.carrying = false;
+          console.log('Dropped the object.');
+          renderGrid();
+        } else {
+          console.log('Cannot drop object here.');
+        }
+      } else {
+        console.log('Cannot drop object here.');
+      }
+    }
+
+    // Updated moveObjectTo function
+    function moveObjectTo(targetX, targetY) {
+      if (targetX < 0 || targetX > 9 || targetY < 0 || targetY > 9) {
+        console.log('Invalid target coordinates.');
+        return;
+      }
+
+      if (!object.exists && !player.carrying) {
+        console.log('No object to move.');
+        return;
+      }
+
+      // Move to adjacent cell facing the object to pick it up
+      const pathToObject = findPathToAdjacent(player.x, player.y, object.x, object.y);
+      executePath(pathToObject, () => {
+        facePosition(object.x, object.y, () => {
+          pick();
+          // Move to adjacent cell facing the target location to drop the object
+          const pathToTarget = findPathToAdjacent(player.x, player.y, targetX, targetY);
+          executePath(pathToTarget, () => {
+            facePosition(targetX, targetY, () => {
+              drop();
+            });
+          });
+        });
+      });
+    }
+
+    // Function to find path to adjacent cell
+    function findPathToAdjacent(startX, startY, targetX, targetY) {
+      // List of adjacent positions to the target
+      const adjacentPositions = [
+        { x: targetX, y: targetY - 1, facing: 'S' },
+        { x: targetX + 1, y: targetY, facing: 'W' },
+        { x: targetX, y: targetY + 1, facing: 'N' },
+        { x: targetX - 1, y: targetY, facing: 'E' },
+      ];
+
+      // Filter positions that are within bounds
+      const validPositions = adjacentPositions.filter(pos => pos.x >= 0 && pos.x < 10 && pos.y >= 0 && pos.y < 10);
+
+      // Try to find the shortest path to any of the valid adjacent positions
+      let shortestPath = null;
+      for (let pos of validPositions) {
+        const path = findPath(player.x, player.y, pos.x, pos.y, player.dirIndex);
+        if (path && (shortestPath === null || path.length < shortestPath.length)) {
+          shortestPath = path;
+          shortestPath.finalFacing = pos.facing;
+        }
+      }
+      return shortestPath;
+    }
+
+    // Pathfinding algorithm (BFS)
+    function findPath(startX, startY, endX, endY, dirIndex) {
+      const queue = [{ x: startX, y: startY, dirIndex, path: [] }];
+      const visited = new Set();
+      visited.add(`${startX},${startY},${dirIndex}`);
+
+      while (queue.length > 0) {
+        const current = queue.shift();
+        if (current.x === endX && current.y === endY) {
+          return current.path;
+        }
+
+        // Move forward
+        let newX = current.x;
+        let newY = current.y;
+        switch (dirMap[current.dirIndex]) {
+          case 'N':
+            newY -= 1;
+            break;
+          case 'E':
+            newX += 1;
+            break;
+          case 'S':
+            newY += 1;
+            break;
+          case 'W':
+            newX -= 1;
+            break;
+        }
+        if (newX >= 0 && newX < 10 && newY >= 0 && newY < 10) {
+          const key = `${newX},${newY},${current.dirIndex}`;
+          if (!visited.has(key)) {
+            visited.add(key);
+            queue.push({
+              x: newX,
+              y: newY,
+              dirIndex: current.dirIndex,
+              path: [...current.path, 'moveForward']
+            });
+          }
+        }
+
+        // Turn left
+        let newDirLeft = (current.dirIndex + 3) % 4;
+        const keyLeft = `${current.x},${current.y},${newDirLeft}`;
+        if (!visited.has(keyLeft)) {
+          visited.add(keyLeft);
+          queue.push({
+            x: current.x,
+            y: current.y,
+            dirIndex: newDirLeft,
+            path: [...current.path, 'turnLeft']
+          });
+        }
+
+        // Turn right
+        let newDirRight = (current.dirIndex + 1) % 4;
+        const keyRight = `${current.x},${current.y},${newDirRight}`;
+        if (!visited.has(keyRight)) {
+          visited.add(keyRight);
+          queue.push({
+            x: current.x,
+            y: current.y,
+            dirIndex: newDirRight,
+            path: [...current.path, 'turnRight']
+          });
+        }
+      }
+      return null;
+    }
+
+    function facePosition(targetX, targetY, callback) {
+      const dx = targetX - player.x;
+      const dy = targetY - player.y;
+      let desiredDirection;
+
+      if (dx === 0 && dy === -1) desiredDirection = 'N';
+      else if (dx === 1 && dy === 0) desiredDirection = 'E';
+      else if (dx === 0 && dy === 1) desiredDirection = 'S';
+      else if (dx === -1 && dy === 0) desiredDirection = 'W';
+      else {
+        console.log('Cannot face target position from current location.');
+        if (callback) callback();
+        return;
+      }
+
+      const turns = getTurnsToFace(desiredDirection);
+      executePath(turns, callback);
+    }
+
+    function getTurnsToFace(desiredDirection) {
+      const currentDirection = dirMap[player.dirIndex];
+      const directionOrder = ['N', 'E', 'S', 'W'];
+      let currentIndex = directionOrder.indexOf(currentDirection);
+      let desiredIndex = directionOrder.indexOf(desiredDirection);
+
+      let leftTurns = (currentIndex - desiredIndex + 4) % 4;
+      let rightTurns = (desiredIndex - currentIndex + 4) % 4;
+
+      let turns = [];
+      if (leftTurns <= rightTurns) {
+        for (let i = 0; i < leftTurns; i++) {
+          turns.push('turnLeft');
+        }
+      } else {
+        for (let i = 0; i < rightTurns; i++) {
+          turns.push('turnRight');
+        }
+      }
+      return turns;
+    }
+
+    function executePath(path, callback) {
+      if (!path) {
+        console.log('No path found.');
+        return;
+      }
+      let index = 0;
+      function nextStep() {
+        if (index < path.length) {
+          window[path[index]]();
+          index++;
+          setTimeout(nextStep, 100); // Adjust speed as needed
+        } else if (callback) {
+          callback();
+        }
+      }
+      nextStep();
+    }
+
+    // Expose functions to the console
+    window.moveForward = moveForward;
+    window.turnLeft = turnLeft;
+    window.turnRight = turnRight;
+    window.pick = pick;
+    window.drop = drop;
+    window.moveObjectTo = moveObjectTo;
+
+    // Handle keypress events
+    document.addEventListener('keydown', function(event) {
+      switch (event.key) {
+        case 'ArrowUp':
+          moveForward();
+          break;
+        case 'ArrowLeft':
+          turnLeft();
+          break;
+        case 'ArrowRight':
+          turnRight();
+          break;
+        case ' ':
+          if (player.carrying) {
+            drop();
+          } else {
+            pick();
+          }
+          break;
+        case 'Enter':
+          const coords = prompt('Enter target coordinates as x,y:');
+          if (coords) {
+            const [xStr, yStr] = coords.split(',');
+            const x = parseInt(xStr.trim());
+            const y = parseInt(yStr.trim());
+            moveObjectTo(x, y);
+          }
+          break;
+      }
+    });
+
+    // Initialize the game
+    initGame();
+  </script>
+</body>
+</html>
